@@ -18,57 +18,71 @@ class SessionScreen extends StatefulWidget {
 class _SessionScreenState extends State<SessionScreen> {
   final player = AudioPlayer();
   String genre = "jungle";
-  List<int> chosen = [];
+  List<int> options = [];
   String title = "";
   String artist = "";
   String sessionId = Uuid().v1();
   Future<bool> playing;
+  final int numOptions = 2;
+  Random rng = new Random();
 
   @override
   void initState() {
     super.initState();
     Database db = database();
     DatabaseReference ref = db.ref('sessions/$sessionId');
-    buildRandomSession();
-    ref.onValue.listen((e) async {
+    options = buildOptions();
+    buildSessionSongs(rng.nextInt(jungle.length));
+    ref.once('value').then((e) async {
       DataSnapshot datasnapshot = e.snapshot;
       // initAudio(datasnapshot.toJson()['playing_now']);
       // Do something with datasnapshot
-      title = datasnapshot.toJson()['title'];
-      artist = datasnapshot.toJson()['artist'];
-      initAudio(datasnapshot.toJson()['url']);
+
+      initAudio(datasnapshot.toJson());
     });
   }
 
-  void buildRandomSession() async {
-    // Select a random starting song
-    var rng = new Random();
-    var numOptions = 2;
-    var nowPlaying = rng.nextInt(jungle.length);
-    chosen.add(nowPlaying);
-    for (int i = 0; i < numOptions; i++) {
-      var songIndex = rng.nextInt(jungle.length);
-      while (chosen.contains(songIndex)) {
-        songIndex = rng.nextInt(jungle.length);
-      }
-      chosen.add(songIndex);
+  List<int> buildOptions() {
+    print("rebuilding options");
+    return jungle.map((song) {
+      return song.id;
+    }).toList();
+  }
+
+  void buildSessionSongs(int chosenSong) async {
+    if (options.length < 4) {
+      setState(() {
+        options = buildOptions();
+        print(options);
+      });
+    }
+
+    options.remove(chosenSong);
+    print(options);
+    var option1Index = options[rng.nextInt(options.length - 1)];
+    var option2Index = options[rng.nextInt(options.length - 2)];
+    if (option1Index == option2Index) {
+      option2Index += 1;
     }
 
     var songData = {
-      "url": jungle[chosen[0]].url,
-      "artist": jungle[chosen[0]].artist,
-      "title": jungle[chosen[0]].title,
+      "url": jungle[chosenSong].url,
+      "artist": jungle[chosenSong].artist,
+      "title": jungle[chosenSong].title,
+      "id": chosenSong,
       "voting_options": [
         {
-          "url": jungle[chosen[1]].url,
-          "artist": jungle[chosen[1]].artist,
-          "title": jungle[chosen[1]].title,
+          "url": jungle[option1Index].url,
+          "artist": jungle[option1Index].artist,
+          "title": jungle[option1Index].title,
+          "id": option1Index,
           "votes": 0
         },
         {
-          "url": jungle[chosen[2]].url,
-          "artist": jungle[chosen[2]].artist,
-          "title": jungle[chosen[2]].title,
+          "url": jungle[option2Index].url,
+          "artist": jungle[option2Index].artist,
+          "title": jungle[option2Index].title,
+          "id": option2Index,
           "votes": 0
         }
       ]
@@ -76,11 +90,32 @@ class _SessionScreenState extends State<SessionScreen> {
     database().ref('sessions/' + sessionId).set(songData);
   }
 
-  void initAudio(String songUrl) async {
-    var duration = await player.setUrl(songUrl);
+  void initAudio(dynamic songJson) async {
+    print("init audio is running");
+    var duration = await player.setUrl(songJson['url']);
+    print(songJson['url']);
     player.play();
     setState(() {
+      title = songJson['title'];
+      artist = songJson['artist'];
       playing = Future.value(true);
+    });
+  }
+
+  void playNextSong() async {
+    database()
+        .ref('sessions/$sessionId/voting_options')
+        .once("value")
+        .then((event) {
+      if (event.snapshot.val()[0]['votes'] > event.snapshot.val()[1]['votes']) {
+        buildSessionSongs(event.snapshot.val()[0]['id']);
+        print("calling init audio");
+        initAudio(event.snapshot.val()[0]);
+      } else {
+        buildSessionSongs(event.snapshot.val()[1]['id']);
+        print("calling init audio");
+        initAudio(event.snapshot.val()[1]);
+      }
     });
   }
 
@@ -88,14 +123,11 @@ class _SessionScreenState extends State<SessionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
-          image: DecorationImage(
-              fit: BoxFit.cover, image: AssetImage("images/beans_bg.png")),
-        ),
         child: FutureBuilder(
           future: playing,
           builder: (context, snapshot) {
-            if (snapshot.hasData) {
+            if (snapshot.hasData &&
+                snapshot.connectionState == ConnectionState.done) {
               return Column(
                 children: [
                   Align(
@@ -148,15 +180,33 @@ class _SessionScreenState extends State<SessionScreen> {
                           : Icon(Icons.play_arrow),
                     ),
                   ),
-                  Slider(
-                    value:
-                        player.position.inSeconds / player.duration.inSeconds,
-                    onChanged: (value) {},
+                  StreamBuilder(
+                    stream: player.positionStream,
+                    builder: (context, snapshot) {
+                      if (snapshot.hasData) {
+                        Duration position = snapshot.data;
+                        if (position.inSeconds >= player.duration.inSeconds) {
+                          playNextSong();
+                        }
+                        return Slider(
+                          value: position.inSeconds / player.duration.inSeconds,
+                          onChanged: (value) {
+                            player.seek(Duration(
+                                seconds: (player.duration.inSeconds * value)
+                                    .floor()));
+                          },
+                        );
+                      }
+                      return Slider(
+                        value: 0,
+                        onChanged: (value) {},
+                      );
+                    },
                   )
                 ],
               );
             }
-            return CircularProgressIndicator();
+            return Center(child: CircularProgressIndicator());
           },
         ),
       ),
