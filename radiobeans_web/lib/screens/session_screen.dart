@@ -22,6 +22,7 @@ class _SessionScreenState extends State<SessionScreen> {
   String title = "";
   String artist = "";
   String sessionId = Uuid().v1();
+  Future<bool> playing;
 
   @override
   void initState() {
@@ -29,7 +30,7 @@ class _SessionScreenState extends State<SessionScreen> {
     Database db = database();
     DatabaseReference ref = db.ref('sessions/$sessionId');
     buildRandomSession();
-    ref.onValue.listen((e) {
+    ref.onValue.listen((e) async {
       DataSnapshot datasnapshot = e.snapshot;
       // initAudio(datasnapshot.toJson()['playing_now']);
       // Do something with datasnapshot
@@ -78,6 +79,9 @@ class _SessionScreenState extends State<SessionScreen> {
   void initAudio(String songUrl) async {
     var duration = await player.setUrl(songUrl);
     player.play();
+    setState(() {
+      playing = Future.value(true);
+    });
   }
 
   @override
@@ -89,61 +93,70 @@ class _SessionScreenState extends State<SessionScreen> {
               fit: BoxFit.cover, image: AssetImage("images/beans_bg.png")),
         ),
         child: FutureBuilder(
+          future: playing,
           builder: (context, snapshot) {
-            return Column(
-              children: [
-                Align(
-                    alignment: Alignment.centerLeft,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Logo(),
-                    )),
-                Container(),
-                Container(
-                    padding: EdgeInsets.all(15),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(sessionId)),
-                SizedBox(
-                  height: 25,
-                ),
-                Text(
-                  title,
-                  style: strongText,
-                ),
-                Text(artist),
-                SizedBox(
-                  height: 25,
-                ),
-                GestureDetector(
-                  onTap: () {
-                    if (player.playing) {
-                      setState(() {
-                        player.pause();
-                      });
-                    } else {
-                      setState(() {
-                        player.play();
-                      });
-                    }
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                        color: player.playing
-                            ? Colors.redAccent
-                            : Colors.lightGreen,
-                        border: Border.all(color: Colors.black, width: 2),
-                        borderRadius: BorderRadius.circular(12)),
-                    padding: EdgeInsets.fromLTRB(40, 10, 40, 10),
-                    child: player.playing
-                        ? Icon(Icons.pause)
-                        : Icon(Icons.play_arrow),
+            if (snapshot.hasData) {
+              return Column(
+                children: [
+                  Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Logo(),
+                      )),
+                  Container(),
+                  Container(
+                      padding: EdgeInsets.all(15),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(sessionId)),
+                  SizedBox(
+                    height: 25,
                   ),
-                )
-              ],
-            );
+                  Text(
+                    title,
+                    style: strongText,
+                  ),
+                  Text(artist),
+                  SizedBox(
+                    height: 25,
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      if (player.playing) {
+                        setState(() {
+                          player.pause();
+                        });
+                      } else {
+                        setState(() {
+                          player.play();
+                        });
+                      }
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                          color: player.playing
+                              ? Colors.redAccent
+                              : Colors.lightGreen,
+                          border: Border.all(color: Colors.black, width: 2),
+                          borderRadius: BorderRadius.circular(12)),
+                      padding: EdgeInsets.fromLTRB(40, 10, 40, 10),
+                      child: player.playing
+                          ? Icon(Icons.pause)
+                          : Icon(Icons.play_arrow),
+                    ),
+                  ),
+                  Slider(
+                    value:
+                        player.position.inSeconds / player.duration.inSeconds,
+                    onChanged: (value) {},
+                  )
+                ],
+              );
+            }
+            return CircularProgressIndicator();
           },
         ),
       ),
