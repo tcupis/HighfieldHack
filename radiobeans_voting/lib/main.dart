@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:radiobeans_voting/theme_data.dart';
 import 'package:radiobeans_voting/voting_screen.dart';
 
+import 'logo.dart';
+
 void main() {
   initializeApp(
         apiKey: "AIzaSyA0b-UT43jKrbFY6Ew_mrWNKVaH3bKdNYE",
@@ -22,7 +24,8 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'RadioBeans',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         // This is the theme of your application.
         //
@@ -51,7 +54,7 @@ class _SessionSelectScreenState extends State<SessionSelectScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
         appBar: AppBar(
-          title: Text("RadioBeans", style: strongText.copyWith(color: Colors.black),),
+          title: Logo(),
           backgroundColor: Colors.transparent,
         ),
         body: Row(

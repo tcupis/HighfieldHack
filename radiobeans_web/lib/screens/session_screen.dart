@@ -25,12 +25,13 @@ class _SessionScreenState extends State<SessionScreen> {
   Future<bool> playing;
   final int numOptions = 2;
   Random rng = new Random();
+  DatabaseReference ref;
 
   @override
   void initState() {
     super.initState();
     Database db = database();
-    DatabaseReference ref = db.ref('sessions/$sessionId');
+    ref = db.ref('sessions/$sessionId');
     options = buildOptions();
     buildSessionSongs(rng.nextInt(jungle.length));
     ref.once('value').then((e) async {
@@ -183,8 +184,10 @@ class _SessionScreenState extends State<SessionScreen> {
                   StreamBuilder(
                     stream: player.positionStream,
                     builder: (context, snapshot) {
-                      if (snapshot.hasData) {
-                        Duration position = snapshot.data;
+                      Duration position = snapshot.data;
+                      if (snapshot.hasData &&
+                          position != null &&
+                          player.duration != null) {
                         if (position.inSeconds >= player.duration.inSeconds) {
                           playNextSong();
                         }
@@ -202,7 +205,7 @@ class _SessionScreenState extends State<SessionScreen> {
                         onChanged: (value) {},
                       );
                     },
-                  )
+                  ),
                 ],
               );
             }
